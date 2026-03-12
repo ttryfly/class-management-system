@@ -118,29 +118,35 @@ const app = {
         }
         
         const btn = document.querySelector('#registerForm button');
+        const originalText = btn.textContent;
         btn.textContent = '注册中...';
         btn.disabled = true;
 
-        const result = await store.registerUser(emailInput, passwordInput);
-        
-        if (result.success) {
-            if (result.needsConfirmation) {
-                this.showToast('注册已提交！请前往您的邮箱查收确认邮件。', 'success');
-                // Switch back to login form
-                this.toggleAuthMode('login');
+        try {
+            const result = await store.registerUser(emailInput, passwordInput);
+            
+            if (result.success) {
+                if (result.needsConfirmation) {
+                    this.showToast('注册已提交！请前往您的邮箱查收确认邮件。', 'success');
+                    // Switch back to login form
+                    this.toggleAuthMode('login');
+                } else {
+                    this.showToast('注册成功！正在登录...');
+                    // Auto login after registration
+                    await store.loginUser(emailInput, passwordInput);
+                    document.getElementById('registerForm').reset();
+                    await this.checkAuth();
+                }
             } else {
-                this.showToast('注册成功！正在登录...');
-                // Auto login after registration
-                await store.loginUser(emailInput, passwordInput);
-                document.getElementById('registerForm').reset();
-                await this.checkAuth();
+                this.showToast(result.message, 'error');
             }
-        } else {
-            this.showToast(result.message, 'error');
+        } catch (err) {
+            console.error('Registration UI error:', err);
+            this.showToast('发生意外错误，请检查网络或控制台', 'error');
+        } finally {
+            btn.textContent = originalText;
+            btn.disabled = false;
         }
-        
-        btn.textContent = '注 册';
-        btn.disabled = false;
     },
     
     async logout() {
