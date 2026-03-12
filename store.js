@@ -34,6 +34,7 @@ class Store {
 
     async registerUser(email, password) {
         try {
+            console.log('Starting Supabase signUp for:', email);
             const { data, error } = await supabase.auth.signUp({
                 email: email,
                 password: password,
