@@ -23,9 +23,6 @@
 </head>
 <body>
 
-    <script src="store.js" onerror="alert('store.js 加载失败')"></script>
-    <script src="app.js" onerror="alert('app.js 加载失败')"></script>
-
     <!-- Main Content Container (Hidden until logged in) -->
     <div id="appContainer" style="display: none; height: 100vh; width: 100%;">
         <!-- Sidebar -->
@@ -439,7 +436,10 @@
 
     <!-- Toast Notifications Container -->
     <div class="toast-container" id="toastContainer"></div>
+ 
+    <script src="store.js" onerror="alert('store.js 加载失败')"></script>
+    <script src="app.js" onerror="alert('app.js 加载失败')"></script>
 
-    <!-- Scripts already loaded at top -->
+    <!-- Scripts already loaded above -->
 </body>
 </html>
