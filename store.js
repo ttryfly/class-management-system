@@ -4,17 +4,34 @@
 
 const SUPABASE_URL = 'https://ubfrulsdwanoowkiwkcf.supabase.co';
 const SUPABASE_KEY = 'sb_publishable_LCEmx_UPJWwp61k2nlSh3Q_8qgPDF-8';
-// Initialize Supabase client
-const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+// Initialize Supabase client with safety check
+let supabase;
+try {
+    if (!window.supabase) {
+        throw new Error('Supabase SDK 未加载，请检查网络连接或 CDN 地址。');
+    }
+    supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+} catch (e) {
+    console.error('Supabase 初始化失败:', e);
+}
 
 class Store {
     constructor() {
         this.currentUser = null;
+        this.initialized = !!supabase;
+    }
+
+    checkInitialized() {
+        if (!this.initialized) {
+            throw new Error('Supabase 客户端未初始化，无法执行操作。');
+        }
     }
 
     // --- Authentication ---
     async getCurrentUser() {
         try {
+            this.checkInitialized();
             const { data: { session }, error } = await supabase.auth.getSession();
             if (error) throw error;
             if (session) {
@@ -34,6 +51,7 @@ class Store {
 
     async registerUser(email, password) {
         try {
+            this.checkInitialized();
             console.log('Starting Supabase signUp for:', email);
             const { data, error } = await supabase.auth.signUp({
                 email: email,
@@ -61,6 +79,7 @@ class Store {
 
     async loginUser(email, password) {
         try {
+            this.checkInitialized();
             const { data, error } = await supabase.auth.signInWithPassword({
                 email: email,
                 password: password
