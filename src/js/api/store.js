@@ -1,9 +1,8 @@
 /**
- * Data Management Layer using Supabase
+ * Data Management Layer using Supabase (ES Module)
  */
 
-const SUPABASE_URL = 'https://ubfrulsdwanoowkiwkcf.supabase.co';
-const SUPABASE_KEY = 'sb_publishable_LCEmx_UPJWwp61k2nlSh3Q_8qgPDF-8';
+import { SUPABASE_URL, SUPABASE_KEY } from './config.js';
 
 // Initial state for the supabase client
 let supabase;
@@ -31,7 +30,6 @@ class Store {
 
     checkInitialized() {
         if (!this.initialized) {
-            // Re-attempt init if we missed it earlier
             this.initSupabase();
             if (!this.initialized) {
                 throw new Error('Supabase 客户端尚未就绪');
@@ -63,7 +61,6 @@ class Store {
     async registerUser(email, password) {
         try {
             this.checkInitialized();
-            console.log('Starting Supabase signUp for:', email);
             const { data, error } = await supabase.auth.signUp({
                 email: email,
                 password: password,
@@ -335,7 +332,4 @@ class Store {
     }
 }
 
-// Global Export
-window.store = new Store();
-// Keep local constant for script internal use
-const store = window.store;
+export const store = new Store();
