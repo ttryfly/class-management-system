@@ -26,7 +26,9 @@ const app = {
     async testConnection() {
         console.log('%c[Supabase 诊断]', 'color: #3ecf8e; font-weight: bold;', '正在检查连接...');
         try {
-            const result = await store.getCurrentUser();
+            const storeObj = window.store || (typeof store !== 'undefined' ? store : null);
+            if (!storeObj) throw new Error('Store 对象未定义');
+            const result = await storeObj.getCurrentUser();
             console.log('%c[Supabase 诊断]', 'color: #3ecf8e; font-weight: bold;', '连接正常。当前状态:', result ? '已登录' : '未登录');
         } catch (e) {
             console.error('%c[Supabase 诊断]', 'color: #ff4d4f; font-weight: bold;', '连接检测失败:', e.message);
@@ -136,7 +138,10 @@ const app = {
         btn.disabled = true;
 
         try {
-            const result = await store.registerUser(emailInput, passwordInput);
+            const storeObj = window.store || (typeof store !== 'undefined' ? store : null);
+            if (!storeObj) throw new Error('数据组件 (store) 加载失败，请尝试刷新页面');
+            
+            const result = await storeObj.registerUser(emailInput, passwordInput);
             
             if (result.success) {
                 if (result.needsConfirmation) {

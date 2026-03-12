@@ -5,26 +5,37 @@
 const SUPABASE_URL = 'https://ubfrulsdwanoowkiwkcf.supabase.co';
 const SUPABASE_KEY = 'sb_publishable_LCEmx_UPJWwp61k2nlSh3Q_8qgPDF-8';
 
-// Initialize Supabase client with safety check
+// Initial state for the supabase client
 let supabase;
-try {
-    if (!window.supabase) {
-        throw new Error('Supabase SDK 未加载，请检查网络连接或 CDN 地址。');
-    }
-    supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
-} catch (e) {
-    console.error('Supabase 初始化失败:', e);
-}
 
 class Store {
     constructor() {
         this.currentUser = null;
-        this.initialized = !!supabase;
+        this.initialized = false;
+        this.initSupabase();
+    }
+
+    initSupabase() {
+        try {
+            if (!window.supabase) {
+                console.warn('Store: Supabase SDK 未在 window 对象中发现。');
+                return;
+            }
+            supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+            this.initialized = !!supabase;
+            console.log('Store: Supabase 客户端初始化成功');
+        } catch (e) {
+            console.error('Store: Supabase 初始化过程中发生错误:', e);
+        }
     }
 
     checkInitialized() {
         if (!this.initialized) {
-            throw new Error('Supabase 客户端未初始化，无法执行操作。');
+            // Re-attempt init if we missed it earlier
+            this.initSupabase();
+            if (!this.initialized) {
+                throw new Error('Supabase 客户端尚未就绪');
+            }
         }
     }
 
@@ -43,7 +54,7 @@ class Store {
                 return this.currentUser;
             }
         } catch(e) {
-            console.error(e);
+            console.error('getCurrentUser Error:', e);
         }
         this.currentUser = null;
         return null;
@@ -64,7 +75,6 @@ class Store {
             });
             if (error) throw error;
             
-            // If data.session is null, it means email confirmation is required
             return { 
                 success: true, 
                 session: data.session,
@@ -85,11 +95,9 @@ class Store {
                 password: password
             });
             if (error) throw error;
-            // Fetch session immediately to establish context
             await this.getCurrentUser();
             return { success: true };
         } catch (err) {
-            // Translate common auth errors
             let msg = err.message || '登录失败';
             if (msg.includes('Invalid login credentials')) msg = '邮箱或密码错误';
             return { success: false, message: msg };
@@ -97,106 +105,126 @@ class Store {
     }
 
     async logoutUser() {
-        await supabase.auth.signOut();
+        try {
+            this.checkInitialized();
+            await supabase.auth.signOut();
+        } catch(e) { console.error(e); }
         this.currentUser = null;
     }
 
     // --- Students ---
     async getStudents() {
-        const { data, error } = await supabase.from('students').select('*').order('created_at', { ascending: false });
-        if (error) { console.error('Error fetching students:', error); return []; }
-        
-        // Map current_courses to courses array to match old API
-        return data.map(s => ({
-            ...s,
-            courses: s.current_courses || []
-        }));
+        try {
+            this.checkInitialized();
+            const { data, error } = await supabase.from('students').select('*').order('created_at', { ascending: false });
+            if (error) throw error;
+            return data.map(s => ({ ...s, courses: s.current_courses || [] }));
+        } catch(e) { console.error(e); return []; }
     }
 
     async addStudent(studentData) {
-        if (!this.currentUser) return;
-        const payload = {
-            user_id: this.currentUser.id,
-            name: studentData.name,
-            phone: studentData.phone,
-            balance: studentData.balance || 0,
-            current_courses: studentData.courses || []
-        };
-        const { error, data } = await supabase.from('students').insert([payload]);
-        if (error) console.error(error);
+        try {
+            this.checkInitialized();
+            if (!this.currentUser) return;
+            const payload = {
+                user_id: this.currentUser.id,
+                name: studentData.name,
+                phone: studentData.phone,
+                balance: studentData.balance || 0,
+                current_courses: studentData.courses || []
+            };
+            const { error } = await supabase.from('students').insert([payload]);
+            if (error) throw error;
+        } catch(e) { console.error(e); }
     }
 
     async updateStudent(id, studentData) {
-        if (!this.currentUser) return;
-        const payload = {
-            name: studentData.name,
-            phone: studentData.phone
-        };
-        const { error } = await supabase.from('students').update(payload).eq('id', id);
-        if (error) console.error(error);
+        try {
+            this.checkInitialized();
+            if (!this.currentUser) return;
+            const payload = { name: studentData.name, phone: studentData.phone };
+            const { error } = await supabase.from('students').update(payload).eq('id', id);
+            if (error) throw error;
+        } catch(e) { console.error(e); }
     }
 
     async deleteStudent(id) {
-        if (!this.currentUser) return;
-        const { error } = await supabase.from('students').delete().eq('id', id);
-        if (error) console.error(error);
+        try {
+            this.checkInitialized();
+            if (!this.currentUser) return;
+            const { error } = await supabase.from('students').delete().eq('id', id);
+            if (error) throw error;
+        } catch(e) { console.error(e); }
     }
 
     // --- Courses ---
     async getCourses() {
-        const { data, error } = await supabase.from('courses').select('*').order('created_at', { ascending: false });
-        if (error) { console.error('Error fetching courses:', error); return []; }
-        return data.map(c => ({
-            ...c,
-            defaultHours: c.default_hours
-        }));
+        try {
+            this.checkInitialized();
+            const { data, error } = await supabase.from('courses').select('*').order('created_at', { ascending: false });
+            if (error) throw error;
+            return data.map(c => ({ ...c, defaultHours: c.default_hours }));
+        } catch(e) { console.error(e); return []; }
     }
 
     async addCourse(courseData) {
-        if (!this.currentUser) return;
-        const payload = {
-            user_id: this.currentUser.id,
-            name: courseData.name,
-            default_hours: courseData.defaultHours || 1,
-            description: courseData.description || ''
-        };
-        const { error } = await supabase.from('courses').insert([payload]);
-        if (error) console.error(error);
+        try {
+            this.checkInitialized();
+            if (!this.currentUser) return;
+            const payload = {
+                user_id: this.currentUser.id,
+                name: courseData.name,
+                default_hours: courseData.defaultHours || 1,
+                description: courseData.description || ''
+            };
+            const { error } = await supabase.from('courses').insert([payload]);
+            if (error) throw error;
+        } catch(e) { console.error(e); }
     }
 
     async updateCourse(id, courseData) {
-        if (!this.currentUser) return;
-        const payload = {
-            name: courseData.name,
-            default_hours: courseData.defaultHours || 1,
-            description: courseData.description || ''
-        };
-        const { error } = await supabase.from('courses').update(payload).eq('id', id);
-        if (error) console.error(error);
+        try {
+            this.checkInitialized();
+            if (!this.currentUser) return;
+            const payload = {
+                name: courseData.name,
+                default_hours: courseData.defaultHours || 1,
+                description: courseData.description || ''
+            };
+            const { error } = await supabase.from('courses').update(payload).eq('id', id);
+            if (error) throw error;
+        } catch(e) { console.error(e); }
     }
 
     async deleteCourse(id) {
-        if (!this.currentUser) return;
-        const { error } = await supabase.from('courses').delete().eq('id', id);
-        if (error) console.error(error);
+        try {
+            this.checkInitialized();
+            if (!this.currentUser) return;
+            const { error } = await supabase.from('courses').delete().eq('id', id);
+            if (error) throw error;
+        } catch(e) { console.error(e); }
     }
 
     // --- Purchases ---
     async getPurchases() {
-        const { data, error } = await supabase.from('purchases').select('*').order('date', { ascending: false });
-        if (error) { console.error('Error fetching purchases:', error); return []; }
-        return data.map(p => ({
-            ...p,
-            studentId: p.student_id,
-            courseId: p.course_id,
-            hoursBought: p.hours_bought
-        }));
+        try {
+            this.checkInitialized();
+            const { data, error } = await supabase.from('purchases').select('*').order('date', { ascending: false });
+            if (error) throw error;
+            return data.map(p => ({
+                ...p,
+                studentId: p.student_id,
+                courseId: p.course_id,
+                hoursBought: p.hours_bought
+            }));
+        } catch(e) { console.error(e); return []; }
     }
 
     async addPurchase(purchaseData) {
-        if (!this.currentUser) return { success: false, message: '未登录' };
         try {
-            // Insert Purchase Record
+            this.checkInitialized();
+            if (!this.currentUser) return { success: false, message: '未登录' };
+            
             const payload = {
                 user_id: this.currentUser.id,
                 student_id: purchaseData.studentId,
@@ -207,7 +235,6 @@ class Store {
             const { error: insertError } = await supabase.from('purchases').insert([payload]);
             if (insertError) throw insertError;
 
-            // Fetch student to update balance
             const { data: student } = await supabase.from('students').select('balance, current_courses').eq('id', purchaseData.studentId).single();
             if (student) {
                 const newBalance = Number(student.balance) + Number(purchaseData.hoursBought);
@@ -230,20 +257,24 @@ class Store {
 
     // --- Sign-ins ---
     async getSignins() {
-        const { data, error } = await supabase.from('signins').select('*').order('date', { ascending: false });
-        if (error) { console.error('Error fetching signins:', error); return []; }
-        return data.map(s => ({
-            ...s,
-            studentId: s.student_id,
-            courseId: s.course_id,
-            hoursDeducted: s.hours_deducted
-        }));
+        try {
+            this.checkInitialized();
+            const { data, error } = await supabase.from('signins').select('*').order('date', { ascending: false });
+            if (error) throw error;
+            return data.map(s => ({
+                ...s,
+                studentId: s.student_id,
+                courseId: s.course_id,
+                hoursDeducted: s.hours_deducted
+            }));
+        } catch(e) { console.error(e); return []; }
     }
 
     async addSignin(signinData) {
-        if (!this.currentUser) return { success: false, message: '未登录' };
         try {
-            // Fetch student balance first
+            this.checkInitialized();
+            if (!this.currentUser) return { success: false, message: '未登录' };
+            
             const { data: student } = await supabase.from('students').select('balance').eq('id', signinData.studentId).single();
             if (!student) throw new Error("找不到该学员");
             
@@ -252,7 +283,6 @@ class Store {
                 return { success: false, message: `扣除失败：学员剩余课时不足 (${currentBalance})` };
             }
 
-            // Record Signin
             const payload = {
                 user_id: this.currentUser.id,
                 student_id: signinData.studentId,
@@ -263,7 +293,6 @@ class Store {
             const { error: insertError } = await supabase.from('signins').insert([payload]);
             if (insertError) throw insertError;
 
-            // Update Balance
             const newBalance = currentBalance - signinData.hoursDeducted;
             const { error: upError } = await supabase.from('students').update({ balance: newBalance }).eq('id', signinData.studentId);
             if (upError) throw upError;
@@ -277,37 +306,36 @@ class Store {
 
     // --- Dashboard Stats Derived ---
     async getDashboardStats() {
-        // Parallel fetch for speed
-        const [students, courses, signins] = await Promise.all([
-            this.getStudents(),
-            this.getCourses(),
-            this.getSignins()
-        ]);
-        
-        const totalStudents = students.length;
-        const totalCourses = courses.length;
-        const lowBalanceCount = students.filter(s => s.balance <= 3).length;
-        
-        // Map recent 5 signins with names
-        const recentSignins = signins
-            .slice(0, 5) // Already sorted descending by getSignins
-            .map(s => {
-                const st = students.find(x => x.id === s.studentId);
-                const cu = courses.find(x => x.id === s.courseId);
-                return {
-                    ...s,
-                    studentName: st ? st.name : '已删除学员',
-                    courseName: cu ? cu.name : '已删除课程'
-                }
-            });
+        try {
+            this.checkInitialized();
+            const [students, courses, signins] = await Promise.all([
+                this.getStudents(),
+                this.getCourses(),
+                this.getSignins()
+            ]);
             
-        return {
-            totalStudents,
-            totalCourses,
-            lowBalanceCount,
-            recentSignins
-        };
+            const totalStudents = students.length;
+            const totalCourses = courses.length;
+            const lowBalanceCount = students.filter(s => s.balance <= 3).length;
+            
+            const recentSignins = signins
+                .slice(0, 5)
+                .map(s => {
+                    const st = students.find(x => x.id === s.studentId);
+                    const cu = courses.find(x => x.id === s.courseId);
+                    return {
+                        ...s,
+                        studentName: st ? st.name : '已删除学员',
+                        courseName: cu ? cu.name : '已删除课程'
+                    }
+                });
+                
+            return { totalStudents, totalCourses, lowBalanceCount, recentSignins };
+        } catch(e) { console.error(e); return { totalStudents: 0, totalCourses: 0, lowBalanceCount: 0, recentSignins: [] }; }
     }
 }
 
-const store = new Store();
+// Global Export
+window.store = new Store();
+// Keep local constant for script internal use
+const store = window.store;
