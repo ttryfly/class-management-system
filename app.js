@@ -18,6 +18,19 @@ const app = {
 
         // Check Authentication first
         await this.checkAuth();
+        
+        // Diagnostic: Check Supabase Connection
+        this.testConnection();
+    },
+
+    async testConnection() {
+        console.log('%c[Supabase 诊断]', 'color: #3ecf8e; font-weight: bold;', '正在检查连接...');
+        try {
+            const result = await store.getCurrentUser();
+            console.log('%c[Supabase 诊断]', 'color: #3ecf8e; font-weight: bold;', '连接正常。当前状态:', result ? '已登录' : '未登录');
+        } catch (e) {
+            console.error('%c[Supabase 诊断]', 'color: #ff4d4f; font-weight: bold;', '连接检测失败:', e.message);
+        }
     },
     
     // --- Authentication ---
@@ -142,7 +155,8 @@ const app = {
             }
         } catch (err) {
             console.error('Registration UI error:', err);
-            this.showToast('发生意外错误，请检查网络或控制台', 'error');
+            const errorMsg = err.message || '发生意外错误';
+            this.showToast(`错误: ${errorMsg} (请检查网络或控制台)`, 'error');
         } finally {
             btn.textContent = originalText;
             btn.disabled = false;
