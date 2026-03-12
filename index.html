@@ -1,0 +1,438 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>培训班课时管理系统</title>
+    <!-- Google Fonts: Inter -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <!-- Font Awesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Custom CSS -->
+    <link rel="stylesheet" href="style.css">
+    <!-- Supabase SDK -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+</head>
+<body>
+
+    <!-- Main Content Container (Hidden until logged in) -->
+    <div id="appContainer" style="display: none; height: 100vh; width: 100%;">
+        <!-- Sidebar -->
+        <aside class="sidebar">
+            <div class="brand">
+                <i class="fa-solid fa-graduation-cap"></i>
+                <span>ClassMgr</span>
+            </div>
+            <nav class="nav-menu" id="navMenu">
+                <a class="nav-item active" data-view="dashboard">
+                    <i class="fa-solid fa-chart-line"></i>
+                    数据看板
+                </a>
+                <a class="nav-item" data-view="students">
+                    <i class="fa-solid fa-users"></i>
+                    学员管理
+                </a>
+                <a class="nav-item" data-view="courses">
+                    <i class="fa-solid fa-book-open"></i>
+                    课程管理
+                </a>
+                <a class="nav-item" data-view="purchases">
+                    <i class="fa-solid fa-cart-shopping"></i>
+                    购课记录
+                </a>
+                <a class="nav-item" data-view="signins">
+                    <i class="fa-solid fa-calendar-check"></i>
+                    签到记录
+                </a>
+            </nav>
+        </aside>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <header class="header">
+                <div class="header-title" id="headerTitle">数据看板</div>
+                <div class="header-actions">
+                    <div class="flex items-center gap-4">
+                        <div class="flex items-center gap-2">
+                            <span class="text-muted"><i class="fa-solid fa-clock"></i></span>
+                            <span id="currentTime" style="font-size: 0.875rem; color: var(--text-muted); font-weight:500;"></span>
+                        </div>
+                        <div class="flex items-center gap-2" style="padding-left: 1rem; border-left: 1px solid var(--border);">
+                            <span id="currentUsername" style="font-size: 0.875rem; font-weight:600;"></span>
+                            <button class="btn btn-secondary btn-sm" onclick="app.logout()">退出</button>
+                        </div>
+                    </div>
+                </div>
+            </header>
+
+            <div class="content-area">
+            
+            <!-- VIEW: Dashboard -->
+            <section id="view-dashboard" class="view-section active">
+                <div class="stats-grid">
+                    <div class="stat-card" style="cursor: pointer;" onclick="app.switchView('students')">
+                        <div class="stat-header">
+                            <span>总学员数</span>
+                            <div class="stat-icon primary"><i class="fa-solid fa-user-graduate"></i></div>
+                        </div>
+                        <div class="stat-value" id="dash-total-students">0</div>
+                    </div>
+                    <div class="stat-card" style="cursor: pointer;" onclick="app.switchView('courses')">
+                        <div class="stat-header">
+                            <span>在设课程</span>
+                            <div class="stat-icon success"><i class="fa-solid fa-layer-group"></i></div>
+                        </div>
+                        <div class="stat-value" id="dash-total-courses">0</div>
+                    </div>
+                    <div class="stat-card" style="cursor: pointer;" onclick="app.switchView('signins')">
+                        <div class="stat-header">
+                            <span>课时告急 (< 3课时)</span>
+                            <div class="stat-icon warning"><i class="fa-solid fa-triangle-exclamation"></i></div>
+                        </div>
+                        <div class="stat-value text-warning" id="dash-low-balance">0</div>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <div class="card-header">
+                        <h3 class="card-title">近期签到记录</h3>
+                        <div class="flex items-center gap-2">
+                            <button class="btn btn-success" style="background-color: var(--secondary); color: white;" onclick="app.openModal('signinModal')">
+                                <i class="fa-solid fa-check" style="margin-right: 0.5rem;"></i>立刻签到
+                            </button>
+                            <button class="btn btn-secondary btn-sm" onclick="app.switchView('signins')">查看全部</button>
+                        </div>
+                    </div>
+                    <div class="table-container">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>学员姓名</th>
+                                    <th>扣除课程</th>
+                                    <th>扣除数</th>
+                                    <th>签到时间</th>
+                                </tr>
+                            </thead>
+                            <tbody id="dash-recent-signins">
+                                <!-- Data injected by JS -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </section>
+
+            <!-- VIEW: Students -->
+            <section id="view-students" class="view-section">
+                <div class="card">
+                    <div class="card-header">
+                        <h3 class="card-title">学员列表</h3>
+                        <button class="btn btn-primary" onclick="app.openModal('studentModal')">
+                            <i class="fa-solid fa-plus" style="margin-right: 0.5rem;"></i>添加学员
+                        </button>
+                    </div>
+                    <div class="table-container">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>姓名</th>
+                                    <th>联系电话</th>
+                                    <th>在读课程</th>
+                                    <th>总购课时</th>
+                                    <th>已消课时</th>
+                                    <th>剩余课时</th>
+                                    <th>录入时间</th>
+                                    <th>操作</th>
+                                </tr>
+                            </thead>
+                            <tbody id="table-students">
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </section>
+
+            <!-- VIEW: Courses -->
+            <section id="view-courses" class="view-section">
+                <div class="card">
+                    <div class="card-header">
+                        <h3 class="card-title">课程列表</h3>
+                        <button class="btn btn-primary" onclick="app.openModal('courseModal')">
+                            <i class="fa-solid fa-plus" style="margin-right: 0.5rem;"></i>添加课程
+                        </button>
+                    </div>
+                    <div class="table-container">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>课程名称</th>
+                                    <th>默认消耗课时</th>
+                                    <th>描述</th>
+                                    <th>录入时间</th>
+                                    <th>操作</th>
+                                </tr>
+                            </thead>
+                            <tbody id="table-courses">
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </section>
+
+            <!-- VIEW: Purchases -->
+            <section id="view-purchases" class="view-section">
+                <div class="card">
+                    <div class="card-header">
+                        <h3 class="card-title">购课记录</h3>
+                        <button class="btn btn-primary" onclick="app.openModal('purchaseModal')">
+                            <i class="fa-solid fa-cart-plus" style="margin-right: 0.5rem;"></i>录入购课
+                        </button>
+                    </div>
+                    <div class="table-container">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>学员</th>
+                                    <th>购买课程大类</th>
+                                    <th>购买课时</th>
+                                    <th>充值时间</th>
+                                </tr>
+                            </thead>
+                            <tbody id="table-purchases">
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </section>
+
+            <!-- VIEW: Sign-ins -->
+            <section id="view-signins" class="view-section">
+                <div class="card">
+                    <div class="card-header">
+                        <h3 class="card-title">所有签到记录</h3>
+                    </div>
+                    <div class="table-container">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>学员</th>
+                                    <th>签到课程</th>
+                                    <th>扣除课时</th>
+                                    <th>签到时间</th>
+                                </tr>
+                            </thead>
+                            <tbody id="table-signins">
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </section>
+
+        </div>
+    </main>
+    </div> <!-- /appContainer -->
+
+    <!-- Auth Container (Visible when logged out) -->
+    <div id="authContainer" style="display: flex; height: 100vh; width: 100%; align-items: center; justify-content: center; background-color: var(--background);">
+        <div class="card" style="width: 100%; max-width: 400px; padding: 2rem;">
+            <div style="text-align: center; margin-bottom: 2rem;">
+                <div style="font-size: 3rem; color: var(--primary); margin-bottom: 1rem;"><i class="fa-solid fa-graduation-cap"></i></div>
+                <h2 style="font-size: 1.5rem; font-weight: 700; color: var(--text-main);">培训班课时管理系统</h2>
+                <p style="color: var(--text-muted); margin-top: 0.5rem;" id="authSubtitle">请登录您的账户</p>
+            </div>
+
+            <!-- Login Form -->
+            <form id="loginForm">
+                <div class="input-group">
+                    <label class="input-label">邮箱</label>
+                    <input type="email" class="input-field" id="loginEmail" required placeholder="请输入您的登录邮箱">
+                </div>
+                <div class="input-group">
+                    <label class="input-label">密码</label>
+                    <input type="password" class="input-field" id="loginPassword" required placeholder="请输入密码">
+                </div>
+                <button type="button" class="btn btn-primary" style="width: 100%; margin-top: 1rem; padding: 0.75rem;" onclick="app.login()">登 录</button>
+                <div style="text-align: center; margin-top: 1.5rem; font-size: 0.875rem;">
+                    <span style="color: var(--text-muted);">还没有账户？</span>
+                    <a href="#" style="color: var(--primary); font-weight: 500; text-decoration: none;" onclick="app.toggleAuthMode('register')">立即注册</a>
+                </div>
+            </form>
+
+            <!-- Register Form (Hidden by default) -->
+            <form id="registerForm" class="hidden">
+                <div class="input-group">
+                    <label class="input-label">注册邮箱</label>
+                    <input type="email" class="input-field" id="regEmail" required placeholder="请输入您的常用邮箱">
+                </div>
+                <div class="input-group">
+                    <label class="input-label">设置密码</label>
+                    <input type="password" class="input-field" id="regPassword" required placeholder="请设置登录密码">
+                </div>
+                <div class="input-group">
+                    <label class="input-label">确认密码</label>
+                    <input type="password" class="input-field" id="regConfirmPassword" required placeholder="请再次输入密码以确认">
+                </div>
+                <button type="button" class="btn btn-primary" style="width: 100%; margin-top: 1rem; padding: 0.75rem;" onclick="app.register()">注 册</button>
+                <div style="text-align: center; margin-top: 1.5rem; font-size: 0.875rem;">
+                    <span style="color: var(--text-muted);">已有账户？</span>
+                    <a href="#" style="color: var(--primary); font-weight: 500; text-decoration: none;" onclick="app.toggleAuthMode('login')">返回登录</a>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Modal: Student -->
+    <div class="modal-overlay" id="studentModal">
+        <div class="modal">
+            <div class="modal-header">
+                <h3 class="modal-title" id="studentModalTitle">添加学员</h3>
+                <button class="modal-close" onclick="app.closeModal('studentModal')"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <div class="modal-body">
+                <form id="studentForm">
+                    <input type="hidden" id="studentId">
+                    <div class="input-group">
+                        <label class="input-label">姓名 *</label>
+                        <input type="text" class="input-field" id="studentName" required placeholder="例如：张小明">
+                    </div>
+                    <div class="input-group">
+                        <label class="input-label">联系电话 *</label>
+                        <input type="tel" class="input-field" id="studentPhone" required placeholder="例如：13800138000">
+                    </div>
+                    <div class="input-group" id="studentCourseGroup">
+                        <label class="input-label">初始报名课程</label>
+                        <select class="input-field" id="studentCourse">
+                            <!-- Populated by JS -->
+                        </select>
+                        <p style="font-size:0.75rem; color: var(--text-muted); margin-top:0.25rem;">（选填）学员初始报名的课程。后续如果报名新课可以在购买记录中体现。</p>
+                    </div>
+                    <div class="input-group" id="studentBalanceGroup">
+                        <label class="input-label">初始课时</label>
+                        <input type="number" class="input-field" id="studentBalance" min="0" value="0">
+                        <p style="font-size:0.75rem; color: var(--text-muted); margin-top:0.25rem;">建议建档后通过“购课”功能充值。</p>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="app.closeModal('studentModal')">取消</button>
+                <button class="btn btn-primary" onclick="app.saveStudent()">保存</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal: Course -->
+    <div class="modal-overlay" id="courseModal">
+        <div class="modal">
+            <div class="modal-header">
+                <h3 class="modal-title" id="courseModalTitle">添加课程</h3>
+                <button class="modal-close" onclick="app.closeModal('courseModal')"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <div class="modal-body">
+                <form id="courseForm">
+                    <input type="hidden" id="courseId">
+                    <div class="input-group">
+                        <label class="input-label">课程名称 *</label>
+                        <input type="text" class="input-field" id="courseName" required placeholder="例如：少儿编程基础班">
+                    </div>
+                    <div class="input-group">
+                        <label class="input-label">签到默认消耗课时 *</label>
+                        <input type="number" class="input-field" id="courseHours" required min="1" value="1">
+                    </div>
+                    <div class="input-group">
+                        <label class="input-label">课程描述</label>
+                        <input type="text" class="input-field" id="courseDesc" placeholder="简短的一句话描述">
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="app.closeModal('courseModal')">取消</button>
+                <button class="btn btn-primary" onclick="app.saveCourse()">保存</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal: Purchase -->
+    <div class="modal-overlay" id="purchaseModal">
+        <div class="modal">
+            <div class="modal-header">
+                <h3 class="modal-title">学员购课/充值</h3>
+                <button class="modal-close" onclick="app.closeModal('purchaseModal')"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <div class="modal-body">
+                <form id="purchaseForm">
+                    <div class="input-group">
+                        <label class="input-label">选择学员 *</label>
+                        <select class="input-field" id="purchaseStudent" required>
+                        </select>
+                    </div>
+                    <div class="input-group">
+                        <label class="input-label">意向课程 *</label>
+                        <select class="input-field" id="purchaseCourse" required>
+                        </select>
+                        <p style="font-size:0.75rem; color: var(--text-muted); margin-top:0.25rem;">仅用于记录购买意向分类，课时进入总账户。</p>
+                    </div>
+                    <div class="input-group">
+                        <label class="input-label">购买课时数量 *</label>
+                        <input type="number" class="input-field" id="purchaseHours" required min="1" value="10">
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="app.closeModal('purchaseModal')">取消</button>
+                <button class="btn btn-primary" onclick="app.savePurchase()">确认充值</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal: Signin -->
+    <div class="modal-overlay" id="signinModal">
+        <div class="modal">
+            <div class="modal-header">
+                <h3 class="modal-title">学员签到</h3>
+                <button class="modal-close" onclick="app.closeModal('signinModal')"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <div class="modal-body">
+                <form id="signinForm">
+                    <div class="input-group">
+                        <label class="input-label">签到学员 *</label>
+                        <select class="input-field" id="signinStudent" required onchange="app.updateSigninPreview()">
+                        </select>
+                    </div>
+                    <div class="input-group">
+                        <label class="input-label">上课内容 (课程) *</label>
+                        <select class="input-field" id="signinCourse" required onchange="app.updateSigninPreview()">
+                        </select>
+                    </div>
+                    <div class="input-group">
+                        <label class="input-label">实际扣除课时 *</label>
+                        <input type="number" class="input-field" id="signinHours" required min="0.5" step="0.5">
+                    </div>
+                    
+                    <div style="background-color: var(--background); padding: 1rem; border-radius: var(--radius-sm); margin-top: 1.5rem;">
+                        <div class="flex justify-between" style="font-size: 0.875rem; margin-bottom: 0.5rem;">
+                            <span class="text-muted">当前剩余：</span>
+                            <span class="font-bold" id="signinPreviewBalance" style="color: var(--primary);">0</span>
+                        </div>
+                        <div class="flex justify-between" style="font-size: 0.875rem;">
+                            <span class="text-muted">签到后剩余：</span>
+                            <span class="font-bold" id="signinPreviewAfter">0</span>
+                        </div>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="app.closeModal('signinModal')">取消</button>
+                <button class="btn btn-danger" onclick="app.saveSignin()">确认扣除并签到</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast Notifications Container -->
+    <div class="toast-container" id="toastContainer"></div>
+
+    <!-- Scripts -->
+    <script src="store.js"></script>
+    <script src="app.js"></script>
+</body>
+</html>
