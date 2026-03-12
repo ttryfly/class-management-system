@@ -124,11 +124,17 @@ const app = {
         const result = await store.registerUser(emailInput, passwordInput);
         
         if (result.success) {
-            this.showToast('注册成功！正在登录...');
-            // Auto login after registration
-            await store.loginUser(emailInput, passwordInput);
-            document.getElementById('registerForm').reset();
-            await this.checkAuth();
+            if (result.needsConfirmation) {
+                this.showToast('注册已提交！请前往您的邮箱查收确认邮件。', 'success');
+                // Switch back to login form
+                this.toggleAuthMode('login');
+            } else {
+                this.showToast('注册成功！正在登录...');
+                // Auto login after registration
+                await store.loginUser(emailInput, passwordInput);
+                document.getElementById('registerForm').reset();
+                await this.checkAuth();
+            }
         } else {
             this.showToast(result.message, 'error');
         }

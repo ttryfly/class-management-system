@@ -3,7 +3,7 @@
  */
 
 const SUPABASE_URL = 'https://ubfrulsdwanoowkiwkcf.supabase.co';
-const SUPABASE_KEY = 'sb_secret_tdEJ8epUOFIS9CefPwknj' + 'w_IOHS7dra';
+const SUPABASE_KEY = 'sb_publishable_LCEmx_UPJWwp61k2nlSh3Q_8qgPDF-8';
 // Initialize Supabase client
 const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
@@ -44,8 +44,16 @@ class Store {
                 }
             });
             if (error) throw error;
-            return { success: true };
+            
+            // If data.session is null, it means email confirmation is required
+            return { 
+                success: true, 
+                session: data.session,
+                user: data.user,
+                needsConfirmation: !data.session && data.user
+            };
         } catch (err) {
+            console.error('Registration error:', err);
             return { success: false, message: err.message || '注册失败' };
         }
     }
